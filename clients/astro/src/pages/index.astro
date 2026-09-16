@@ -1,0 +1,382 @@
+---
+const apiBaseUrl = import.meta.env.PUBLIC_FLAGS_API_BASE_URL ?? '';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="A minimal administration console for binary feature flags and applications." />
+    <title>Flags · Admin</title>
+  </head>
+  <body>
+    <div class="app-shell" data-api-base={apiBaseUrl}>
+      <aside class="sidebar" aria-label="Primary navigation">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+          <span>flagship</span>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item is-active" data-view="flags" aria-current="page" type="button">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3v14M5 4h9l-2.2 3L14 10H5" /></svg>
+            <span>Feature flags</span>
+            <span class="nav-count" id="flag-nav-count">4</span>
+          </button>
+          <button class="nav-item" data-view="applications" type="button">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.75 16 6v8l-6 3.25L4 14V6l6-3.25Z" /><path d="M4.3 6.2 10 9.25l5.7-3.05M10 9.25v8" /></svg>
+            <span>Applications</span>
+            <span class="nav-count" id="application-nav-count">3</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-foot">
+          <div class="api-status"><span class="status-dot"></span><span id="api-status-label">Local preview</span></div>
+          <p>Binary flags, kept simple.</p>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <strong class="topbar-title" id="topbar-context-label">Feature flags</strong>
+          <div class="topbar-actions">
+            <button class="icon-button" type="button" aria-label="View keyboard shortcuts" title="Keyboard shortcuts">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4.75 5.5h10.5A1.75 1.75 0 0 1 17 7.25v5.5a1.75 1.75 0 0 1-1.75 1.75H4.75A1.75 1.75 0 0 1 3 12.75v-5.5A1.75 1.75 0 0 1 4.75 5.5Z" /><path d="M5.75 8.5h.01M8.25 8.5h.01M10.75 8.5h.01M13.25 8.5h.01M6.5 11.25h7" /></svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="content-wrap">
+          <section class="page-heading">
+            <div>
+              <p class="section-kicker" id="page-kicker">CONTROL PLANE</p>
+              <h1 id="page-title">Feature flags</h1>
+              <p class="page-description" id="page-description">Turn product capabilities on or off across your applications.</p>
+            </div>
+            <button class="primary-button" id="create-button" type="button">
+              <svg viewBox="0 0 18 18" aria-hidden="true"><path d="M9 3.5v11M3.5 9h11" /></svg>
+              <span id="create-button-label">Create flag</span>
+            </button>
+          </section>
+
+          <section class="summary-strip" aria-label="Overview">
+            <div><span class="summary-label">Total flags</span><strong id="total-flags">4</strong></div>
+            <div><span class="summary-label">Currently on</span><strong class="summary-green" id="enabled-flags">2</strong></div>
+            <div><span class="summary-label">Applications</span><strong id="total-applications">3</strong></div>
+            <div class="summary-note"><span class="pulse"></span><span id="summary-note-text">Changes sync through your external API</span></div>
+          </section>
+
+          <section class="toolbar" aria-label="Search and filter controls">
+            <label class="search-field">
+              <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.75" cy="8.75" r="5.25" /><path d="m12.75 12.75 4 4" /></svg>
+              <input id="search-input" type="search" placeholder="Search flags by name or key" autocomplete="off" />
+            </label>
+            <label class="select-field" id="status-filter-wrap">
+              <span class="sr-only">Filter flags by state</span>
+              <select id="status-filter">
+                <option value="all">All states</option>
+                <option value="on">On</option>
+                <option value="off">Off</option>
+              </select>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" /></svg>
+            </label>
+            <span class="result-count" id="result-count">4 flags</span>
+          </section>
+
+          <section class="table-shell" aria-live="polite">
+            <div class="table-header flags-header" id="flags-header">
+              <span>Flag</span><span>Description</span><span>Applications</span><span>State</span><span>Updated</span><span></span>
+            </div>
+            <div id="resource-list"></div>
+          </section>
+          <p class="keyboard-hint"><kbd>⌘</kbd><kbd>K</kbd> to focus search <span>·</span> <kbd>Esc</kbd> to close a panel</p>
+        </div>
+      </main>
+
+      <aside class="detail-panel" id="detail-panel" aria-label="Resource details" aria-hidden="true">
+        <div class="panel-topline">
+          <span id="panel-resource-label">FEATURE FLAG</span>
+          <button class="close-button" id="close-panel" type="button" aria-label="Close details">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg>
+          </button>
+        </div>
+        <div id="panel-content"></div>
+      </aside>
+    </div>
+
+    <div class="modal-backdrop" id="modal-backdrop" hidden>
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-header">
+          <div><p class="section-kicker" id="modal-kicker">NEW FEATURE FLAG</p><h2 id="modal-title">Create a feature flag</h2></div>
+          <button class="close-button" id="close-modal" type="button" aria-label="Close dialog"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15" /></svg></button>
+        </div>
+        <form id="resource-form">
+          <div class="form-grid" id="form-grid"></div>
+          <div class="form-actions"><button class="secondary-button" id="cancel-modal" type="button">Cancel</button><button class="primary-button" type="submit" id="submit-form">Create flag</button></div>
+        </form>
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"><span class="toast-check">✓</span><span id="toast-message">Saved</span></div>
+  </body>
+</html>
+
+<style is:global>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+  :root { color-scheme: light; --navy: #11243c; --navy-deep: #0b1b2e; --ink: #16243a; --muted: #68778d; --faint: #97a4b5; --line: #dfe5ec; --canvas: #f5f7fa; --surface: #ffffff; --coral: #eb5a4c; --coral-dark: #d94b3e; --blue: #3e77e8; --green: #17945f; --green-soft: #e8f6ef; --amber: #c98113; --amber-soft: #fff5df; }
+  * { box-sizing: border-box; }
+  html { font-family: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif; color: var(--ink); background: var(--canvas); }
+  body { margin: 0; min-width: 320px; background: var(--canvas); }
+  button, input, select { font: inherit; }
+  button { cursor: pointer; }
+  svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.6; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  .app-shell { min-height: 100vh; display: flex; }
+  .sidebar { width: 248px; flex: 0 0 248px; display: flex; flex-direction: column; padding: 28px 16px 18px; background: var(--navy-deep); color: #cad3df; }
+  .brand-lockup { display: flex; align-items: center; gap: 10px; padding: 0 10px 29px; color: #fff; font-size: 18px; font-weight: 700; letter-spacing: -.04em; }
+  .brand-mark { width: 23px; height: 23px; display: flex; align-items: flex-end; gap: 3px; padding: 2px 4px; border: 1px solid rgba(255,255,255,.3); border-radius: 7px 7px 3px 3px; }
+  .brand-mark span { width: 4px; border-radius: 2px 2px 0 0; background: #f46c5c; }
+  .brand-mark span:nth-child(1) { height: 9px; }.brand-mark span:nth-child(2) { height: 14px; background: #f9b09e; }.brand-mark span:nth-child(3) { height: 11px; background: #d9e4ee; }
+  .nav-list { display: grid; gap: 4px; }.nav-item { min-height: 43px; display: flex; align-items: center; gap: 11px; width: 100%; padding: 0 11px; border: 0; border-radius: 8px; color: #9baabd; background: transparent; text-align: left; font-size: 12px; font-weight: 500; }.nav-item svg { width: 18px; height: 18px; color: #8092a9; }.nav-item:hover { color: #fff; background: rgba(255,255,255,.07); }.nav-item.is-active { color: white; background: #213c60; box-shadow: inset 3px 0 0 #ee6a5b; }.nav-item.is-active svg { color: #f18c7f; }.nav-count { margin-left: auto; color: #73849a; font-family: 'DM Mono', monospace; font-size: 10px; }.nav-item.is-active .nav-count { color: #c4d4e9; }
+  .sidebar-foot { margin-top: auto; padding: 17px 10px 0; border-top: 1px solid rgba(255,255,255,.12); }.api-status { display: flex; align-items: center; gap: 7px; color: #c1d0e1; font-family: 'DM Mono', monospace; font-size: 10px; }.status-dot { width: 6px; height: 6px; border-radius: 50%; background: #4cc992; box-shadow: 0 0 0 3px rgba(76,201,146,.12); }.sidebar-foot p { margin: 9px 0 0; color: #687990; font-size: 10px; }
+  .main-content { min-width: 0; flex: 1; }.topbar { height: 73px; display: flex; align-items: center; justify-content: space-between; padding: 0 42px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.76); }.topbar-title { color: #51627a; font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 500; }.topbar-actions { display: flex; align-items: center; gap: 17px; }.icon-button { display: grid; place-items: center; width: 31px; height: 31px; padding: 0; border: 0; color: #8090a3; background: transparent; }.icon-button:hover { color: var(--ink); }.icon-button svg { width: 19px; }
+  .content-wrap { width: min(1180px, 100%); margin: 0 auto; padding: 47px 42px 38px; }.page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 30px; }.section-kicker { margin: 0 0 9px; color: #8190a5; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 500; letter-spacing: .14em; }.page-heading h1 { margin: 0; color: var(--ink); font-size: clamp(28px, 3vw, 38px); line-height: 1; letter-spacing: -.055em; }.page-description { margin: 13px 0 0; color: var(--muted); font-size: 13px; }.primary-button, .secondary-button { min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 15px; border-radius: 7px; font-size: 12px; font-weight: 600; }.primary-button { border: 1px solid var(--coral); color: white; background: var(--coral); box-shadow: 0 2px 7px rgba(216,75,62,.16); }.primary-button:hover { border-color: var(--coral-dark); background: var(--coral-dark); }.primary-button svg { width: 16px; }.secondary-button { border: 1px solid #cfd7e2; color: #52637b; background: white; }.secondary-button:hover { border-color: #aeb9c8; color: var(--ink); }.primary-button:focus-visible, .secondary-button:focus-visible, .nav-item:focus-visible, .icon-button:focus-visible, .close-button:focus-visible, .table-row:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(62,119,232,.25); outline-offset: 2px; }
+  .summary-strip { display: grid; grid-template-columns: 1fr 1fr 1fr 2.5fr; align-items: center; margin-top: 39px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }.summary-strip > div { min-height: 70px; display: flex; flex-direction: column; justify-content: center; gap: 5px; padding: 0 25px; border-right: 1px solid var(--line); }.summary-strip > div:first-child { padding-left: 0; }.summary-strip > div:last-child { border-right: 0; }.summary-label { color: #8795a8; font-family: 'DM Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: .1em; }.summary-strip strong { color: var(--ink); font-size: 23px; line-height: 1; letter-spacing: -.04em; }.summary-strip .summary-green { color: var(--green); }.summary-note { flex-direction: row !important; align-items: center; gap: 9px !important; color: #8290a4; font-size: 11px; }.pulse { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px var(--green-soft); }
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-top: 28px; }.search-field { position: relative; display: flex; align-items: center; flex: 1; min-width: 170px; }.search-field svg { position: absolute; left: 13px; width: 17px; color: #91a0b1; pointer-events: none; }.search-field input, .select-field select { height: 40px; border: 1px solid #d5dde7; border-radius: 7px; color: var(--ink); background: white; font-size: 12px; }.search-field input { width: 100%; padding: 0 13px 0 39px; outline: none; }.search-field input::placeholder { color: #a0adbc; }.search-field input:focus, .select-field select:focus { border-color: #91a9d7; }.select-field { position: relative; display: block; width: 140px; }.select-field[hidden] { display: none; }.select-field select { width: 100%; appearance: none; padding: 0 34px 0 13px; outline: none; }.select-field svg { position: absolute; top: 13px; right: 12px; width: 14px; color: #8091a5; pointer-events: none; }.result-count { margin-left: 9px; color: #8090a4; font-family: 'DM Mono', monospace; font-size: 10px; white-space: nowrap; }
+  .table-shell { margin-top: 12px; overflow: hidden; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface); }.table-header, .table-row { display: grid; grid-template-columns: minmax(170px, 1.2fr) minmax(190px, 1.45fr) minmax(145px, 1fr) 78px 100px 29px; column-gap: 17px; align-items: center; }.table-header { min-height: 42px; padding: 0 17px; color: #8b99aa; font-family: 'DM Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; background: #fbfcfd; }.table-row { width: 100%; min-height: 76px; padding: 10px 17px; border: 0; border-top: 1px solid #e8edf2; border-radius: 0; color: #52637b; background: #fff; text-align: left; font-size: 11px; cursor: pointer; appearance: none; }.table-row:hover { background: #fbfcff; }.table-row.is-selected { background: #f1f6ff; box-shadow: inset 3px 0 0 var(--blue); }.resource-primary { min-width: 0; }.resource-primary strong, .resource-primary span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.resource-primary strong { color: var(--ink); font-size: 12px; font-weight: 600; }.resource-primary span { margin-top: 5px; color: #99a6b6; font-family: 'DM Mono', monospace; font-size: 9px; }.resource-description { color: #6d7c90; line-height: 1.45; }.app-list { display: flex; align-items: center; gap: 6px; min-width: 0; }.app-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #42546b; }.app-count { display: inline-grid; place-items: center; min-width: 21px; height: 21px; padding: 0 5px; border: 1px solid #d9e1ea; border-radius: 5px; color: #7e8da0; font-family: 'DM Mono', monospace; font-size: 9px; }.state { display: inline-flex; align-items: center; gap: 7px; font-size: 10px; font-weight: 600; }.state-dot { width: 7px; height: 7px; border-radius: 50%; }.state.on { color: var(--green); }.state.on .state-dot { background: #1aa267; }.state.off { color: #8693a4; }.state.off .state-dot { background: #a4afbc; }.updated { color: #8996a8; font-family: 'DM Mono', monospace; font-size: 9px; line-height: 1.4; }.row-menu { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 5px; color: #9aa7b7; background: transparent; }.row-menu:hover { color: var(--ink); background: #eef2f7; }.row-menu svg { width: 17px; }.empty-state { padding: 71px 20px; text-align: center; }.empty-state svg { width: 34px; margin: 0 auto 15px; color: #a9b6c5; }.empty-state h3 { margin: 0; color: var(--ink); font-size: 15px; }.empty-state p { max-width: 300px; margin: 8px auto 20px; color: #8593a5; font-size: 11px; line-height: 1.55; }
+  .keyboard-hint { margin: 15px 0 0; color: #9ba8b7; font-family: 'DM Mono', monospace; font-size: 9px; }.keyboard-hint span { padding: 0 7px; color: #c4cdd7; }.keyboard-hint kbd { display: inline-grid; place-items: center; min-width: 17px; height: 17px; margin-right: 3px; padding: 0 4px; border: 1px solid #d3dbe5; border-radius: 3px; background: white; color: #77869a; font-family: inherit; font-size: 9px; }
+  .detail-panel { position: fixed; z-index: 10; inset: 0 0 0 auto; width: min(395px, 100vw); overflow: auto; padding: 28px 29px 40px; border-left: 1px solid var(--line); background: #fff; box-shadow: -12px 0 35px rgba(23,42,67,.08); transform: translateX(100%); transition: transform .24s ease; }.detail-panel.is-open { transform: translateX(0); }.panel-topline { display: flex; align-items: center; justify-content: space-between; color: #8a98aa; font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .12em; }.close-button { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px; color: #8594a6; background: transparent; }.close-button:hover { color: var(--ink); background: #f1f4f7; }.close-button svg { width: 18px; }.panel-heading { margin: 34px 0 0; }.panel-heading h2 { margin: 0; color: var(--ink); font-size: 24px; line-height: 1.1; letter-spacing: -.045em; }.panel-heading p { margin: 10px 0 0; color: #6e7e93; font-size: 12px; line-height: 1.5; }.panel-meta { display: flex; align-items: center; gap: 8px; margin-top: 13px; }.binary-toggle { position: relative; display: inline-flex; align-items: center; width: 39px; height: 23px; padding: 3px; border: 0; border-radius: 20px; background: #c7d0db; transition: background .15s; }.binary-toggle span { width: 17px; height: 17px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.18); transition: transform .15s; }.binary-toggle.is-on { justify-content: flex-end; background: var(--green); }.binary-toggle:focus-visible { outline: 3px solid rgba(62,119,232,.25); outline-offset: 2px; }.toggle-label { color: #68788e; font-family: 'DM Mono', monospace; font-size: 10px; }.toggle-label.is-on { color: var(--green); }.detail-divider { height: 1px; margin: 28px 0 23px; background: var(--line); }.detail-section { margin-top: 25px; }.detail-section h3 { margin: 0; color: var(--ink); font-size: 12px; }.detail-section > p { margin: 7px 0 0; color: #8694a7; font-size: 11px; line-height: 1.5; }.detail-field { margin-top: 18px; }.detail-field label { display: block; margin-bottom: 7px; color: #8b99aa; font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }.detail-value { display: block; padding: 10px 12px; border: 1px solid #e0e6ed; border-radius: 6px; color: #506078; background: #fbfcfd; font-family: 'DM Mono', monospace; font-size: 10px; }.detail-applications { display: grid; gap: 10px; margin-top: 15px; }.detail-app { display: flex; align-items: center; gap: 9px; color: #506078; font-size: 11px; }.detail-app svg { width: 16px; color: #9aa8b8; }.section-number { display: inline-grid; place-items: center; min-width: 20px; height: 20px; margin-left: 5px; border-radius: 50%; color: #718096; background: #edf2f7; font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 500; vertical-align: 1px; }.mini-state { margin-left: auto; color: #8a98a9; font-family: 'DM Mono', monospace; font-size: 9px; }.on-dot { background: var(--green); }.off-dot { background: #a4afbc; }.detail-actions { display: flex; gap: 8px; margin-top: 31px; padding-top: 21px; border-top: 1px solid var(--line); }.danger-button { min-height: 38px; padding: 0 13px; border: 1px solid #f1c8c3; border-radius: 7px; color: #c45145; background: #fff; font-size: 11px; font-weight: 600; }.danger-button:hover { border-color: #df9991; background: #fff6f5; }.panel-edit-button { flex: 1; }
+  .modal-backdrop { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(11,27,46,.44); }.modal-backdrop[hidden] { display: none; }.modal { width: min(100%, 530px); max-height: calc(100vh - 40px); overflow: auto; border: 1px solid #dbe2eb; border-radius: 10px; background: #fff; box-shadow: 0 20px 70px rgba(11,27,46,.22); }.modal-header { display: flex; align-items: flex-start; justify-content: space-between; padding: 26px 27px 21px; border-bottom: 1px solid var(--line); }.modal-header h2 { margin: 0; color: var(--ink); font-size: 21px; letter-spacing: -.04em; }.modal-header .section-kicker { margin-bottom: 8px; }.modal form { padding: 23px 27px 25px; }.form-grid { display: grid; gap: 17px; }.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }.form-control { display: grid; gap: 7px; }.form-control label { color: #718096; font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }.form-control input, .form-control textarea, .form-control select { width: 100%; border: 1px solid #d5dde7; border-radius: 6px; outline: none; color: var(--ink); background: #fff; font-size: 12px; }.form-control input, .form-control select { height: 39px; padding: 0 11px; }.form-control textarea { min-height: 77px; padding: 10px 11px; resize: vertical; }.form-control input:focus, .form-control textarea:focus, .form-control select:focus { border-color: #91a9d7; box-shadow: 0 0 0 3px rgba(62,119,232,.09); }.checkbox-list { display: grid; gap: 8px; padding-top: 2px; }.checkbox-option { display: flex; align-items: center; gap: 8px; color: #506078; font-size: 11px; }.checkbox-option input { width: 15px; height: 15px; accent-color: var(--blue); }.form-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 25px; padding-top: 19px; border-top: 1px solid var(--line); }.form-actions .primary-button { min-width: 119px; }.toast { position: fixed; z-index: 40; right: 24px; bottom: 24px; display: flex; align-items: center; gap: 9px; padding: 11px 15px 11px 11px; border: 1px solid #c7ebd8; border-radius: 8px; color: #27754e; background: #f1fcf6; box-shadow: 0 10px 30px rgba(21,67,45,.12); font-size: 11px; opacity: 0; transform: translateY(8px); pointer-events: none; transition: opacity .18s, transform .18s; }.toast.is-visible { opacity: 1; transform: translateY(0); }.toast-check { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; color: white; background: var(--green); font-size: 11px; }
+  .applications-header { grid-template-columns: minmax(180px, 1.2fr) minmax(150px, 1.2fr) minmax(200px, 1.6fr) 80px 100px 29px; }.application-row .resource-primary span { font-family: 'DM Mono', monospace; }.flag-count { color: #6f7f94; font-family: 'DM Mono', monospace; font-size: 10px; }
+  @media (max-width: 1050px) { .sidebar { width: 213px; flex-basis: 213px; }.topbar { padding: 0 28px; }.content-wrap { padding-right: 28px; padding-left: 28px; }.table-header, .table-row { grid-template-columns: minmax(150px, 1.2fr) minmax(150px, 1.4fr) minmax(120px, 1fr) 65px 85px 29px; column-gap: 10px; }.resource-description { font-size: 10px; } }
+  @media (max-width: 780px) { .sidebar { width: 62px; flex-basis: 62px; padding: 20px 8px 13px; align-items: center; }.brand-lockup { padding: 0 0 24px; }.brand-lockup > span, .nav-item span, .sidebar-foot p, .api-status span:not(.status-dot) { display: none; }.nav-list { width: 100%; }.nav-item { justify-content: center; padding: 0; }.nav-count { display: none !important; }.sidebar-foot { padding: 16px 0 0; }.main-content { width: calc(100% - 62px); }.topbar { height: 59px; padding: 0 18px; }.content-wrap { padding: 31px 18px 28px; }.page-heading { align-items: flex-start; flex-direction: column; gap: 20px; }.page-heading h1 { font-size: 30px; }.page-description { max-width: 310px; line-height: 1.5; }.page-heading .primary-button { align-self: stretch; }.summary-strip { grid-template-columns: 1fr 1fr; margin-top: 29px; }.summary-strip > div { min-height: 62px; padding: 0 12px; }.summary-strip > div:nth-child(2) { border-right: 0; }.summary-strip > div:nth-child(3) { padding-left: 0; border-top: 1px solid var(--line); }.summary-strip > div:last-child { grid-column: span 2; min-height: 48px; border-top: 1px solid var(--line); }.summary-strip strong { font-size: 20px; }.toolbar { flex-wrap: wrap; margin-top: 20px; }.search-field { flex-basis: 100%; }.select-field { flex: 1; }.result-count { margin-left: auto; }.table-shell { overflow: visible; border-top: 0; border-bottom: 0; background: transparent; }.table-header { display: none; }.table-row { position: relative; width: 100%; min-height: 118px; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto auto; row-gap: 7px; margin-bottom: 8px; padding: 14px 15px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }.table-row .resource-primary { grid-column: 1; grid-row: 1; }.table-row .app-list { grid-column: 2; grid-row: 1; justify-self: end; max-width: 140px; }.table-row .resource-description { grid-column: 1 / -1; grid-row: 2; min-width: 0; max-width: calc(100% - 20px); font-size: 10px; }.table-row .state { grid-column: 1; grid-row: 3; }.table-row .updated { grid-column: 2; grid-row: 3; justify-self: end; padding-right: 25px; }.table-row .row-menu { position: absolute; top: 10px; right: 7px; }.application-row { min-height: 106px; }.application-row .resource-description { grid-row: 2; }.application-row .flag-count { grid-column: 1; grid-row: 3; }.application-row > span:nth-child(4) { display: none; }.detail-panel { width: min(395px, calc(100vw - 62px)); padding-right: 22px; padding-left: 22px; }.keyboard-hint { display: none; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+</style>
+
+<script>
+  import { createFlagsApi, type Application, type FeatureFlag } from '../lib/flags-api';
+
+  const api = createFlagsApi(document.querySelector<HTMLElement>('.app-shell')?.dataset.apiBase ?? '');
+  let flags: FeatureFlag[] = [];
+  let applications: Application[] = [];
+  let activeView: 'flags' | 'applications' = 'flags';
+  let selectedId = '';
+  let editingId = '';
+  let modalResource: 'flag' | 'application' = 'flag';
+  let toastTimer: number | undefined;
+
+  const $ = <T extends HTMLElement>(selector: string) => document.querySelector<T>(selector);
+  const list = $('#resource-list')!;
+  const detailPanel = $('#detail-panel')!;
+  const panelContent = $('#panel-content')!;
+  const modalBackdrop = $('#modal-backdrop')!;
+  const formGrid = $('#form-grid')!;
+  const form = $('#resource-form') as HTMLFormElement;
+  const searchInput = $('#search-input') as HTMLInputElement;
+  const statusFilter = $('#status-filter') as HTMLSelectElement;
+  const escapeHtml = (value: string) => value.replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character] ?? character);
+  const formatDate = (date: string) => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(date));
+  const slugify = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const flagFor = (id: string) => flags.find((flag) => flag.id === id);
+  const appFor = (id: string) => applications.find((application) => application.id === id);
+
+  function showToast(message: string) {
+    const toast = $('#toast')!;
+    $('#toast-message')!.textContent = message;
+    toast.classList.add('is-visible');
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => toast.classList.remove('is-visible'), 2700);
+  }
+
+  function updateSummary() {
+    $('#flag-nav-count')!.textContent = String(flags.length);
+    $('#application-nav-count')!.textContent = String(applications.length);
+    $('#total-flags')!.textContent = String(flags.length);
+    $('#enabled-flags')!.textContent = String(flags.filter((flag) => flag.enabled).length);
+    $('#total-applications')!.textContent = String(applications.length);
+  }
+
+  function renderFlags() {
+    const query = searchInput.value.trim().toLowerCase();
+    const state = statusFilter.value;
+    const filtered = flags.filter((flag) => {
+      const matchesQuery = !query || `${flag.name} ${flag.key} ${flag.description}`.toLowerCase().includes(query);
+      const matchesState = state === 'all' || (state === 'on' && flag.enabled) || (state === 'off' && !flag.enabled);
+      return matchesQuery && matchesState;
+    });
+    $('#result-count')!.textContent = `${filtered.length} ${filtered.length === 1 ? 'flag' : 'flags'}`;
+    list.innerHTML = filtered.length ? filtered.map((flag) => {
+      const appNames = flag.applicationIds.map((id) => appFor(id)?.name).filter(Boolean) as string[];
+      return `<button class="table-row ${selectedId === flag.id ? 'is-selected' : ''}" data-resource-id="${escapeHtml(flag.id)}" type="button">
+        <span class="resource-primary"><strong>${escapeHtml(flag.name)}</strong><span>${escapeHtml(flag.key)}</span></span>
+        <span class="resource-description">${escapeHtml(flag.description)}</span>
+        <span class="app-list"><span class="app-name">${escapeHtml(appNames[0] ?? 'No applications')}</span>${appNames.length > 1 ? `<span class="app-count">+${appNames.length - 1}</span>` : ''}</span>
+        <span class="state ${flag.enabled ? 'on' : 'off'}"><span class="state-dot"></span>${flag.enabled ? 'On' : 'Off'}</span>
+        <span class="updated">${formatDate(flag.updatedAt)}</span>
+        <span class="row-menu" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="5" cy="10" r=".8" fill="currentColor"/><circle cx="10" cy="10" r=".8" fill="currentColor"/><circle cx="15" cy="10" r=".8" fill="currentColor"/></svg></span>
+      </button>`;
+    }).join('') : `<div class="empty-state"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 5h18v22H7zM11 10h10M11 15h10M11 20h6" /></svg><h3>No flags found</h3><p>Try a different search, or create a new binary flag for your applications.</p><button class="secondary-button" data-empty-create type="button">Create flag</button></div>`;
+    list.querySelectorAll<HTMLElement>('[data-resource-id]').forEach((row) => row.addEventListener('click', () => openPanel(row.dataset.resourceId!)));
+    list.querySelector<HTMLElement>('[data-empty-create]')?.addEventListener('click', () => openModal('flag'));
+  }
+
+  function renderApplications() {
+    const query = searchInput.value.trim().toLowerCase();
+    const filtered = applications.filter((application) => !query || `${application.name} ${application.slug} ${application.description}`.toLowerCase().includes(query));
+    $('#result-count')!.textContent = `${filtered.length} ${filtered.length === 1 ? 'application' : 'applications'}`;
+    list.innerHTML = filtered.length ? filtered.map((application) => {
+      const flagCount = flags.filter((flag) => flag.applicationIds.includes(application.id)).length;
+      return `<button class="table-row application-row ${selectedId === application.id ? 'is-selected' : ''}" data-resource-id="${escapeHtml(application.id)}" type="button">
+        <span class="resource-primary"><strong>${escapeHtml(application.name)}</strong><span>${escapeHtml(application.slug)}</span></span>
+        <span class="resource-description">${escapeHtml(application.description)}</span>
+        <span class="flag-count">${flagCount} ${flagCount === 1 ? 'flag' : 'flags'}</span>
+        <span></span><span class="updated">${formatDate(application.updatedAt)}</span>
+        <span class="row-menu" aria-hidden="true"><svg viewBox="0 0 20 20"><circle cx="5" cy="10" r=".8" fill="currentColor"/><circle cx="10" cy="10" r=".8" fill="currentColor"/><circle cx="15" cy="10" r=".8" fill="currentColor"/></svg></span>
+      </button>`;
+    }).join('') : `<div class="empty-state"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 4 26 9.5v13L16 28 6 22.5v-13L16 4Z" /><path d="m6.5 9.8 9.5 5.4 9.5-5.4M16 15.2V28" /></svg><h3>No applications found</h3><p>Try a different search, or add the first application.</p><button class="secondary-button" data-empty-create type="button">Create application</button></div>`;
+    list.querySelectorAll<HTMLElement>('[data-resource-id]').forEach((row) => row.addEventListener('click', () => openPanel(row.dataset.resourceId!)));
+    list.querySelector<HTMLElement>('[data-empty-create]')?.addEventListener('click', () => openModal('application'));
+  }
+
+  function renderList() {
+    if (activeView === 'flags') renderFlags(); else renderApplications();
+  }
+
+  function setView(view: 'flags' | 'applications') {
+    activeView = view;
+    document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach((button) => {
+      const isActive = button.dataset.view === view;
+      button.classList.toggle('is-active', isActive);
+      if (isActive) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
+    });
+    selectedId = '';
+    closePanel();
+    searchInput.value = '';
+    statusFilter.value = 'all';
+    const isFlags = view === 'flags';
+    $('#page-kicker')!.textContent = isFlags ? 'CONTROL PLANE' : 'CONNECTED PRODUCTS';
+    $('#page-title')!.textContent = isFlags ? 'Feature flags' : 'Applications';
+    $('#page-description')!.textContent = isFlags ? 'Turn product capabilities on or off across your applications.' : 'The products and surfaces connected to your feature flags.';
+    $('#topbar-context-label')!.textContent = isFlags ? 'Feature flags' : 'Applications';
+    $('#create-button-label')!.textContent = isFlags ? 'Create flag' : 'Create application';
+    $('#status-filter-wrap')!.hidden = !isFlags;
+    searchInput.placeholder = isFlags ? 'Search flags by name or key' : 'Search applications by name or slug';
+    const header = $('#flags-header')!;
+    header.className = `table-header ${isFlags ? 'flags-header' : 'applications-header'}`;
+    header.innerHTML = isFlags ? '<span>Flag</span><span>Description</span><span>Applications</span><span>State</span><span>Updated</span><span></span>' : '<span>Application</span><span>Description</span><span>Flags</span><span></span><span>Updated</span><span></span>';
+    renderList();
+  }
+
+  function openPanel(id: string) {
+    selectedId = id;
+    renderList();
+    const isFlags = activeView === 'flags';
+    const resource = isFlags ? flagFor(id) : appFor(id);
+    if (!resource) return;
+    $('#panel-resource-label')!.textContent = isFlags ? 'FEATURE FLAG' : 'APPLICATION';
+    panelContent.innerHTML = isFlags ? flagPanel(resource as FeatureFlag) : applicationPanel(resource as Application);
+    detailPanel.classList.add('is-open');
+    detailPanel.setAttribute('aria-hidden', 'false');
+    panelContent.querySelector('[data-panel-edit]')?.addEventListener('click', () => openModal(isFlags ? 'flag' : 'application', id));
+    panelContent.querySelector('[data-panel-delete]')?.addEventListener('click', () => deleteResource(id, isFlags ? 'flag' : 'application'));
+    panelContent.querySelector('[data-toggle-flag]')?.addEventListener('click', () => toggleFlag(id));
+  }
+
+  function flagPanel(flag: FeatureFlag) {
+    const appNames = flag.applicationIds.map((id) => appFor(id)).filter(Boolean) as Application[];
+    return `<div class="panel-heading"><h2>${escapeHtml(flag.name)}</h2><p>${escapeHtml(flag.description)}</p><div class="panel-meta"><button class="binary-toggle ${flag.enabled ? 'is-on' : ''}" data-toggle-flag type="button" aria-label="Turn flag ${flag.enabled ? 'off' : 'on'}"><span></span></button><span class="toggle-label ${flag.enabled ? 'is-on' : ''}">${flag.enabled ? 'On' : 'Off'}</span></div></div>
+      <div class="detail-divider"></div><div class="detail-section"><h3>Flag details</h3><div class="detail-field"><label>Key</label><span class="detail-value">${escapeHtml(flag.key)}</span></div><div class="detail-field"><label>Last updated</label><span class="detail-value">${formatDate(flag.updatedAt)}</span></div></div>
+      <div class="detail-section"><h3>Applications <span class="section-number">${appNames.length}</span></h3><p>This flag is available in these applications.</p><div class="detail-applications">${appNames.length ? appNames.map((app) => `<div class="detail-app"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.75 16 6v8l-6 3.25L4 14V6l6-3.25Z" /><path d="M4.3 6.2 10 9.25l5.7-3.05M10 9.25v8" /></svg>${escapeHtml(app.name)}</div>`).join('') : '<div class="detail-app">No applications assigned</div>'}</div></div>
+      <div class="detail-actions"><button class="secondary-button panel-edit-button" data-panel-edit type="button">Edit flag</button><button class="danger-button" data-panel-delete type="button">Delete</button></div>`;
+  }
+
+  function applicationPanel(application: Application) {
+    const linkedFlags = flags.filter((flag) => flag.applicationIds.includes(application.id));
+    return `<div class="panel-heading"><h2>${escapeHtml(application.name)}</h2><p>${escapeHtml(application.description)}</p></div><div class="detail-divider"></div><div class="detail-section"><h3>Application details</h3><div class="detail-field"><label>Slug</label><span class="detail-value">${escapeHtml(application.slug)}</span></div><div class="detail-field"><label>Last updated</label><span class="detail-value">${formatDate(application.updatedAt)}</span></div></div><div class="detail-section"><h3>Connected flags <span class="section-number">${linkedFlags.length}</span></h3><p>Binary flags currently associated with this application.</p><div class="detail-applications">${linkedFlags.length ? linkedFlags.map((flag) => `<div class="detail-app"><span class="state-dot ${flag.enabled ? 'on-dot' : 'off-dot'}"></span>${escapeHtml(flag.name)}<span class="mini-state">${flag.enabled ? 'On' : 'Off'}</span></div>`).join('') : '<div class="detail-app">No flags connected</div>'}</div></div><div class="detail-actions"><button class="secondary-button panel-edit-button" data-panel-edit type="button">Edit application</button><button class="danger-button" data-panel-delete type="button">Delete</button></div>`;
+  }
+
+  async function toggleFlag(id: string) {
+    const flag = flagFor(id);
+    if (!flag) return;
+    try {
+      const updated = await api.updateFlag(id, { ...flag, enabled: !flag.enabled });
+      flags = flags.map((item) => item.id === id ? updated : item);
+      updateSummary(); renderList(); openPanel(id); showToast(`Flag turned ${updated.enabled ? 'on' : 'off'}`);
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Could not update flag'); }
+  }
+
+  function openModal(resource: 'flag' | 'application', id = '') {
+    modalResource = resource; editingId = id;
+    const flag = resource === 'flag' && id ? flagFor(id) : undefined;
+    const application = resource === 'application' && id ? appFor(id) : undefined;
+    const isEditing = Boolean(id);
+    $('#modal-kicker')!.textContent = isEditing ? `EDIT ${resource === 'flag' ? 'FEATURE FLAG' : 'APPLICATION'}` : `NEW ${resource === 'flag' ? 'FEATURE FLAG' : 'APPLICATION'}`;
+    $('#modal-title')!.textContent = isEditing ? `Edit ${resource === 'flag' ? 'feature flag' : 'application'}` : resource === 'flag' ? 'Create a feature flag' : 'Create an application';
+    $('#submit-form')!.textContent = isEditing ? 'Save changes' : `Create ${resource}`;
+    formGrid.innerHTML = resource === 'flag' ? flagForm(flag) : applicationForm(application);
+    modalBackdrop.hidden = false;
+    window.setTimeout(() => (formGrid.querySelector('input') as HTMLInputElement | null)?.focus(), 30);
+  }
+
+  function flagForm(flag?: FeatureFlag) {
+    return `<div class="form-control"><label for="resource-name">Name</label><input id="resource-name" name="name" required value="${escapeHtml(flag?.name ?? '')}" placeholder="e.g. saved-searches" /></div><div class="form-control"><label for="resource-description">Description</label><textarea id="resource-description" name="description" placeholder="What does this flag control?">${escapeHtml(flag?.description ?? '')}</textarea></div><div class="form-row"><div class="form-control"><label for="resource-state">Initial state</label><select id="resource-state" name="enabled"><option value="off" ${!flag?.enabled ? 'selected' : ''}>Off</option><option value="on" ${flag?.enabled ? 'selected' : ''}>On</option></select></div><div class="form-control"><label>Applications</label><div class="checkbox-list">${applications.map((app) => `<label class="checkbox-option"><input type="checkbox" name="applicationIds" value="${escapeHtml(app.id)}" ${flag?.applicationIds.includes(app.id) ? 'checked' : ''} />${escapeHtml(app.name)}</label>`).join('')}</div></div></div>`;
+  }
+
+  function applicationForm(application?: Application) {
+    return `<div class="form-control"><label for="resource-name">Name</label><input id="resource-name" name="name" required value="${escapeHtml(application?.name ?? '')}" placeholder="e.g. Marketing site" /></div><div class="form-control"><label for="resource-slug">Slug</label><input id="resource-slug" name="slug" required value="${escapeHtml(application?.slug ?? '')}" placeholder="e.g. marketing-site" /></div><div class="form-control"><label for="resource-description">Description</label><textarea id="resource-description" name="description" placeholder="What is this application?">${escapeHtml(application?.description ?? '')}</textarea></div>`;
+  }
+
+  async function submitForm(event: SubmitEvent) {
+    event.preventDefault();
+    const data = new FormData(form);
+    const wasEditing = Boolean(editingId);
+    const resourceId = editingId;
+    try {
+      if (modalResource === 'flag') {
+        const input = { name: String(data.get('name') ?? ''), key: slugify(String(data.get('name') ?? '')).replaceAll('-', '_'), description: String(data.get('description') ?? ''), enabled: data.get('enabled') === 'on', applicationIds: data.getAll('applicationIds').map(String) };
+        const saved = editingId ? await api.updateFlag(editingId, input) : await api.createFlag(input);
+        flags = editingId ? flags.map((flag) => flag.id === editingId ? saved : flag) : [saved, ...flags];
+      } else {
+        const input = { name: String(data.get('name') ?? ''), slug: String(data.get('slug') ?? '') || slugify(String(data.get('name') ?? '')), description: String(data.get('description') ?? '') };
+        const saved = editingId ? await api.updateApplication(editingId, input) : await api.createApplication(input);
+        applications = editingId ? applications.map((application) => application.id === editingId ? saved : application) : [saved, ...applications];
+      }
+      updateSummary(); closeModal(); renderList(); if (wasEditing && resourceId) openPanel(resourceId); showToast(wasEditing ? 'Changes saved' : `${modalResource === 'flag' ? 'Flag' : 'Application'} created`);
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Could not save changes'); }
+  }
+
+  async function deleteResource(id: string, resource: 'flag' | 'application') {
+    const item = resource === 'flag' ? flagFor(id) : appFor(id);
+    if (!item || !window.confirm(`Delete ${resource === 'flag' ? 'flag' : 'application'} “${item.name}”?`)) return;
+    try {
+      if (resource === 'flag') { await api.deleteFlag(id); flags = flags.filter((flag) => flag.id !== id); } else { await api.deleteApplication(id); applications = applications.filter((application) => application.id !== id); flags = flags.map((flag) => ({ ...flag, applicationIds: flag.applicationIds.filter((appId) => appId !== id) })); }
+      selectedId = ''; closePanel(); updateSummary(); renderList(); showToast(`${resource === 'flag' ? 'Flag' : 'Application'} deleted`);
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Could not delete resource'); }
+  }
+
+  function closePanel() { detailPanel.classList.remove('is-open'); detailPanel.setAttribute('aria-hidden', 'true'); selectedId = ''; }
+  function closeModal() { modalBackdrop.hidden = true; editingId = ''; }
+
+  document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach((button) => button.addEventListener('click', () => setView(button.dataset.view as 'flags' | 'applications')));
+  $('#create-button')!.addEventListener('click', () => openModal(activeView === 'flags' ? 'flag' : 'application'));
+  $('#close-panel')!.addEventListener('click', closePanel);
+  $('#close-modal')!.addEventListener('click', closeModal);
+  $('#cancel-modal')!.addEventListener('click', closeModal);
+  form.addEventListener('submit', submitForm);
+  searchInput.addEventListener('input', renderList);
+  statusFilter.addEventListener('change', renderList);
+  document.addEventListener('keydown', (event) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); searchInput.focus(); } if (event.key === 'Escape') { if (!modalBackdrop.hidden) closeModal(); else closePanel(); } });
+
+  async function load() {
+    try {
+      [flags, applications] = await Promise.all([api.listFlags(), api.listApplications()]);
+      $('#api-status-label')!.textContent = api.isMock ? 'Local preview' : 'External API';
+      $('#summary-note-text')!.textContent = api.isMock ? 'Preview data resets on refresh' : 'Changes sync through your external API';
+      updateSummary(); renderList();
+    } catch (error) { list.innerHTML = `<div class="empty-state"><h3>Could not load data</h3><p>${escapeHtml(error instanceof Error ? error.message : 'The external API could not be reached.')}</p></div>`; }
+  }
+
+  load();
+</script>
